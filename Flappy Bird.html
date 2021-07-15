@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="flappy_bird.png" rel="shortcut icon">
+    <title>Shitty Flappy Bird</title>
+    <style>
+        canvas {
+            border:1px solid #d3d3d3;
+            background-color: #f1f1f1;
+        }
+        button {
+            height:50px;
+            width:150px;
+            border:2px solid black;;
+            background: rgb(255, 255, 255);
+            box-sizing: border-box;
+            color:red;
+            text-align:center;
+        }
+        span {
+            font: Arial;
+            font-size:15px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body onload="startGame()">
+    <script>
+        var myGamePiece;
+        var myScore;
+        var wingSound,scoreSound,hitSound,dieSound;
+        function startGame() {
+            myGamePiece = new component(25, 25, "flappy_bird.png", 60, 1, "image");
+            myGamePiece.gravity = 0.2;
+            wingSound = new sound("wing.wav");
+            scoreSound = new sound("score.wav");
+            myScore = new component("30px", "Consolas", "black", 280, 40, "text");
+            myGameArea.start();
+        }
+        var myGameArea = {
+            canvas : document.createElement("canvas"),
+            start : function() {
+                this.canvas.width = 480;
+                this.canvas.height = 270;
+                this.context = this.canvas.getContext("2d");
+                document.body.insertBefore(this.canvas, document.body.childNodes[0]);
+                this.score = 0;
+                this.frameNo = 0;
+                },
+            clear : function() {
+                this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+        }
+        function component(width, height, color, x, y, type) {
+            this.type = type;
+            if (type == "image") {
+                this.image = new Image();
+                this.image.src = color;
+            }
+            this.width = width;
+            this.height = height;
+            this.speedY = 0;    
+            this.x = x;
+            this.y = y;
+            this.gravity = 0;
+            this.gravitySpeed = 0;
+            this.update = function() {
+                ctx = myGameArea.context;
+                if (this.type == "image") ctx.drawImage(this.image,this.x,this.y,this.width, this.height);
+                else if (this.type == "text") {
+                    ctx.font = this.width + " " + this.height;
+                    ctx.fillStyle = color;
+                    ctx.fillText(this.text, this.x, this.y);
+                } 
+                else {
+                    ctx.fillStyle = color;
+                    ctx.fillRect(this.x, this.y, this.width, this.height);
+                }
+            }
+            this.newPos = function() {
+                this.gravitySpeed += this.gravity;
+                this.y += this.gravitySpeed;
+            }
+            this.crashWith = function(otherobj) {
+                var myleft = this.x;
+                var myright = this.x + (this.width);
+                var mytop = this.y;
+                var mybottom = this.y + (this.height);
+                var otherleft = otherobj.x;
+                var otherright = otherobj.x + (otherobj.width);
+                var othertop = otherobj.y;
+                var otherbottom = otherobj.y + (otherobj.height);
+                var crash = true;
+                if ((mybottom < othertop) || (mytop > otherbottom) || (myright < otherleft) || (myleft > otherright)) {
+                    crash = false;
+                }
+                return crash;
+            }
+            this.fall = function() {return this.y + this.height>myGameArea.canvas.height};
+        }
+        var myObstacles = [];
+        function updateGameArea() {
+            var x, height, gap, minHeight, maxHeight, minGap, maxGap;
+            for (i = 0; i < myObstacles.length; i +=1) {
+                if (myGamePiece.crashWith(myObstacles[i])||myGamePiece.fall()) {
+                    var A = new component("50px", "Arial", "red", 100 ,150, "text");
+                    A.text="GAME OVER!";
+                    A.update();
+                    return true;
+                } 
+            }
+            myGameArea.clear();
+            myGameArea.frameNo++;
+            if (myGameArea.frameNo == 1 || everyinterval(80)) {
+                x = myGameArea.canvas.width;
+                y = myGameArea.canvas.height;
+                minHeight = 13.5;
+                maxHeight = 160;
+                height = Math.floor(Math.random()*(maxHeight-minHeight+1)+minHeight);
+                minGap = 70;
+                maxGap = 90;
+                gap = Math.floor(Math.random()*(maxGap-minGap+1)+minGap);
+                myObstacles.push(new component(20, height, "green", x, 0));
+                myObstacles.push(new component(20, y - height - gap, "green", x, height + gap));
+            }
+            for (i = 0; i < myObstacles.length; i += 1) {
+                myObstacles[i].x -= 1.5;
+                myObstacles[i].update();
+                range=(myGamePiece.x+myGamePiece.width)/2-(myObstacles[i].x+myObstacles[i].width)/2;
+                if (range>0&&range<2) 
+                {
+                    myGameArea.score = (i+1)/2;
+                    scoreSound.play();
+                }
+            }
+            myScore.text="SCORE: " + myGameArea.score;
+            myScore.update();
+            myGamePiece.newPos();
+            myGamePiece.update();
+        }
+        function everyinterval(n) {
+            if ((myGameArea.frameNo / n) % 1 == 0) return true;
+            return false;
+        }
+        function sound(src) {
+            this.sound = document.createElement("audio");
+            this.sound.src = src;
+            this.sound.setAttribute("preload", "auto");
+            this.sound.setAttribute("controls", "none");
+            this.sound.style.display = "none";
+            this.sound.volume = 0.3;
+            document.body.appendChild(this.sound);
+            this.play = function(){
+                this.sound.play();
+            }
+            this.stop = function(){
+                this.sound.pause();
+            }    
+        }
+        function gamestop(){
+            if (updateGameArea()) document.getElementsByTagName('span')[0].innerHTML="a";
+        }
+        function flap() {
+            myGamePiece.gravitySpeed = -4;
+        }
+        function accelerate() {
+            myGamePiece.gravity = .2;
+        }
+        function option() {
+            var span = document.getElementsByTagName('span')[0];
+            gamestop();
+            if (span.innerHTML=="Flap!") 
+            {
+                flap();
+                wingSound.play();
+            }
+            else {
+                span.innerHTML="Flap!";
+                span.style.fontSize="25px";
+                myGameArea.interval = setInterval(updateGameArea, 20);
+            } 
+        }
+    </script>
+    <br>
+    <button onmousedown="option()" onmouseup="accelerate()"><span>Click here to start the game</span></button>
+</body>
+</html>
